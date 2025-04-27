@@ -1,0 +1,32 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Instalar dependências do sistema
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    libpq-dev \
+    poppler-utils \
+    antiword \
+    unrtf \
+    tesseract-ocr \
+    libreoffice \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copiar arquivos de requisitos e instalar dependências
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Instalar pacotes adicionais para workers
+RUN pip install --no-cache-dir celery[redis] boto3 pymongo elasticsearch \
+    textract==1.6.3 PyPDF2 python-docx tenacity tiktoken \
+    openai langchain langchain-community langchain-openai
+
+# Copiar código da aplicação
+COPY . .
+
+# Baixar modelo spaCy para português
+RUN python -m spacy download pt_core_news_lg
+
+# Comando para iniciar o worker
+CMD ["celery", "-A", "app.worker.celery_app", "worker", "--loglevel=info", "--concurrency=2"]

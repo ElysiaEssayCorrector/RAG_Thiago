@@ -1,0 +1,35 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Instalar dependências do sistema
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    libpq-dev \
+    poppler-utils \
+    antiword \
+    unrtf \
+    tesseract-ocr \
+    libreoffice \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copiar arquivos de requisitos e instalar dependências
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Instalar pacotes adicionais para ambiente de produção
+RUN pip install --no-cache-dir gunicorn uvloop httptools \
+    textract==1.6.3 PyPDF2 python-docx tenacity tiktoken \
+    openai langchain langchain-community langchain-openai
+
+# Copiar código da aplicação
+COPY . .
+
+# Baixar modelo spaCy para português
+RUN python -m spacy download pt_core_news_lg
+
+# Porta para a API
+EXPOSE 8000
+
+# Comando para executar com Gunicorn + Uvicorn
+CMD ["gunicorn", "app.api.main:app", "--workers", "4", "--worker-class", "uvicorn.workers.UvicornWorker", "--bind", "0.0.0.0:8000"]
